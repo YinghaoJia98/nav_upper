@@ -5,11 +5,13 @@ NavManager::NavManager(const ros::NodeHandle &nh, const ros::NodeHandle &nh_priv
     // ROS_INFO("Hello, world.");
     initialize();
     setupTimer();
+    IfPubCmd_ = false;
 }
 
 void NavManager::initialize()
 {
     std::string CostMap_topic_;
+
     nh_.param<std::string>("/nav_upper/nav_manager_settings/CostMap_topic", CostMap_topic_,
                            std::string("/hello"));
     // std::cout << "The topic is " << CostMap_topic_ << std::endl;
@@ -21,8 +23,17 @@ void NavManager::initialize()
     nh_.param<std::string>("/nav_upper/nav_manager_settings/BodyFrame", BodyFrame_,
                            std::string("base_link"));
 
+    nh_.param<std::string>("/nav_upper/nav_manager_settings/CmdTopic", CmdTopic_,
+                           std::string("/cmd_vel"));
+    CmdVelSubscriber_ = nh_.subscribe(CmdTopic_.c_str(), 1,
+                                      &NavManager::CmdVelCallBack, this);
+    CmdVelPub_ = nh_.advertise<geometry_msgs::Twist>(CmdTopic_.c_str(), 10);
+
     nh_.param<double>("/nav_upper/nav_manager_settings/RobotWidth", robot_width_, 0.5);
     nh_.param<double>("/nav_upper/nav_manager_settings/TimeResidualMax", TimeResidualMax_, 1.0);
+    nh_.param<double>("/nav_upper/nav_manager_settings/LookAhead_X", LookAhead_X_, 1.0);
+    nh_.param<double>("/nav_upper/nav_manager_settings/LookAhead_Time", LookAhead_Time_, 1.0);
+    nh_.param<bool>("/nav_upper/nav_manager_settings/IfTimeInsteadOfConstantXAhead", IfTimeInsteadOfConstantXAhead_, true);
 }
 
 void NavManager::setupTimer()
@@ -36,6 +47,14 @@ void NavManager::setupTimer()
                                             &NavManager::UpdateTargetTimerCallBack, this);
         // ROS_INFO("UpdateTargetFps_ is %f", UpdateTargetFps_);
     }
+    if (1)
+    {
+        double CmdPub_Fps_;
+        nh_.param<double>("/nav_upper/nav_manager_settings/CmdPub_Fps", CmdPub_Fps_, 10.0);
+        double duration_CmdPub = 1.0 / (CmdPub_Fps_ + 0.00001);
+        CmdPubTimer = nh_.createTimer(ros::Duration(duration_CmdPub),
+                                      &NavManager::CmdPubTimerCallBack, this);
+    }
 }
 
 void NavManager::LocalCostMapCallBack(const nav_msgs::OccupancyGrid &msg)
@@ -44,10 +63,56 @@ void NavManager::LocalCostMapCallBack(const nav_msgs::OccupancyGrid &msg)
     LocalCostMap_grid = msg;
 }
 
+void NavManager::CmdVelCallBack(const geometry_msgs::Twist &msg)
+{
+    std::lock_guard<std::mutex> lock2(UpdateCmdMsg_);
+    CmdMsg_ = msg;
+}
+
 void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
 {
     std::lock_guard<std::mutex> lock(UpdateCostMapMutex_);
+    std::lock_guard<std::mutex> lock2(UpdateCmdMsg_);
     ROS_INFO("hello");
+
+    tf::TransformListener world_base_listener;
+    tf::StampedTransform world_base_transform;
+    try
+    {
+        world_base_listener.waitForTransform(WorldFrame_.c_str(), BodyFrame_.c_str(), ros::Time(0), ros::Duration(1.0));
+        world_base_listener.lookupTransform(WorldFrame_.c_str(), BodyFrame_.c_str(),
+                                            ros::Time(0), world_base_transform);
+    }
+    catch (tf::TransformException &ex)
+    {
+        ROS_ERROR("There is something wrong when trying get robot pose to get target orientation.");
+        ROS_ERROR("%s", ex.what());
+        // ros::Duration(1.0).sleep();
+    }
+    tf::Quaternion q_robot_target = world_base_transform.getRotation();
+    double yaw_robot_ = tf::getYaw(q_robot_target);
+    Eigen::Vector3d RobotLocation_(world_base_transform.getOrigin().x(),
+                                   world_base_transform.getOrigin().y(),
+                                   yaw_robot_);
+    bool IfObstaclesExist_;
+    double x_expand_;
+    if (IfTimeInsteadOfConstantXAhead_)
+    {
+        x_expand_ = CmdMsg_.linear.x * LookAhead_Time_;
+    }
+    else
+    {
+        x_expand_ = LookAhead_X_;
+    }
+    IfObstaclesExist_ = IfObstaclesExist(LocalCostMap_grid,
+                                         RobotLocation_,
+                                         robot_width_,
+                                         x_expand_,
+                                         0);
+    if (!IfObstaclesExist_)
+    {
+        return;
+    }
     // TODO Judge if there is obstacle
     // TODO Judge if the obstacle could be avoid
     // TODO Select the new target
@@ -66,6 +131,7 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
     {
         ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.",
                   TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
+        // return true;
     }
 
     double CostMapResolution = CostMap.info.resolution;
@@ -74,6 +140,7 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
     if (CostMapFrame_middle_ != WorldFrame_)
     {
         ROS_ERROR("The frame of CostMap is not the World Frame.");
+        // return true;
     }
     geometry_msgs::Pose CostMapOriginInWorldFrame = CostMap.info.origin;
     tf::Quaternion q_CostMap_Middle_(CostMapOriginInWorldFrame.orientation.x,
@@ -142,4 +209,19 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
         return false;
     }
     return true;
+}
+
+void NavManager::CmdPubTimerCallBack(const ros::TimerEvent &event)
+{
+    if (IfPubCmd_)
+    {
+        geometry_msgs::Twist CmdMsgPub_;
+        CmdMsgPub_.angular.x = 0.0;
+        CmdMsgPub_.angular.y = 0.0;
+        CmdMsgPub_.angular.z = 0.0;
+        CmdMsgPub_.linear.x = 0.5;
+        CmdMsgPub_.linear.y = 0.0;
+        CmdMsgPub_.linear.z = 0.0;
+        CmdVelPub_.publish(CmdMsgPub_);
+    }
 }

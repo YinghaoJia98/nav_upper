@@ -5,3 +5,9 @@ nav_manager_settings:
   TimeResidualMax: 1.0
   WorldFrame: "map"
   BodyFrame: "base_link"
+  LookAhead_X: 1.0
+  CmdTopic: "/cmd_vel"
+  IfTimeInsteadOfConstantXAhead: true
+  LookAhead_Time: 1.0
+  CmdPub_Fps: 10.0
+  SpinnerThread: 5
