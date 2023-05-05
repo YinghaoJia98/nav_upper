@@ -3,6 +3,9 @@
 #include <ros/ros.h>
 #include <string>
 #include <nav_msgs/OccupancyGrid.h>
+#include <eigen3/Eigen/Dense>
+#include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
 
 class NavManager
 {
@@ -11,9 +14,22 @@ public:
     void initialize();
     void setupTimer();
 
+    bool IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
+                          Eigen::Vector3d robot_location,
+                          double robot_width,
+                          double x_expand,
+                          double angle);
+
 private:
     ros::NodeHandle nh_;
     ros::NodeHandle nh_private_;
+
+    std::string WorldFrame_;
+    std::string BodyFrame_;
+    // std::string CostMapFrame_;
+
+    double TimeResidualMax_;
+    double robot_width_;
 
     nav_msgs::OccupancyGrid LocalCostMap_grid;
 

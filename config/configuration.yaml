@@ -1,3 +1,7 @@
 nav_manager_settings:
   CostMap_topic: "/move_base/local_costmap/costmap"
   UpdateTarget_Fps: 5.0
+  RobotWidth: 0.5
+  TimeResidualMax: 1.0
+  WorldFrame: "map"
+  BodyFrame: "base_link"
