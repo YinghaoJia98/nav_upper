@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <nav_upper/nav_upper.h>
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "nav_upper_node");

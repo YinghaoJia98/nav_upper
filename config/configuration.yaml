@@ -11,3 +11,4 @@ nav_manager_settings:
   LookAhead_Time: 1.0
   CmdPub_Fps: 10.0
   SpinnerThread: 5
+  NavStatus_topic: "/move_base/status"

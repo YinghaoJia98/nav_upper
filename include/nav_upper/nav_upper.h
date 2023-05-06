@@ -6,6 +6,7 @@
 #include <eigen3/Eigen/Dense>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
+#include <move_base_msgs/MoveBaseResult.h>
 
 class NavManager
 {
@@ -42,6 +43,9 @@ private:
 
     ros::Subscriber CostMapSubscriber_;
     void LocalCostMapCallBack(const nav_msgs::OccupancyGrid &msg);
+
+    ros::Subscriber NavStatusSubscriber_;
+    void NavStatusCallBack(const move_base_msgs::MoveBaseResult &msg);
 
     ros::Subscriber CmdVelSubscriber_;
     void CmdVelCallBack(const geometry_msgs::Twist &msg);

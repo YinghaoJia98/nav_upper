@@ -10,13 +10,18 @@ NavManager::NavManager(const ros::NodeHandle &nh, const ros::NodeHandle &nh_priv
 
 void NavManager::initialize()
 {
-    std::string CostMap_topic_;
+    std::string CostMap_topic_, NavStatus_topic_;
 
     nh_.param<std::string>("/nav_upper/nav_manager_settings/CostMap_topic", CostMap_topic_,
                            std::string("/hello"));
     // std::cout << "The topic is " << CostMap_topic_ << std::endl;
     CostMapSubscriber_ = nh_.subscribe(CostMap_topic_.c_str(), 1,
                                        &NavManager::LocalCostMapCallBack, this);
+
+    nh_.param<std::string>("/nav_upper/nav_manager_settings/NavStatus_topic", NavStatus_topic_,
+                           std::string("/hello"));
+    NavStatusSubscriber_ = nh_.subscribe(NavStatus_topic_.c_str(), 1,
+                                         &NavManager::NavStatusCallBack, this);
 
     nh_.param<std::string>("/nav_upper/nav_manager_settings/WorldFrame", WorldFrame_,
                            std::string("map"));
@@ -67,6 +72,10 @@ void NavManager::CmdVelCallBack(const geometry_msgs::Twist &msg)
 {
     std::lock_guard<std::mutex> lock2(UpdateCmdMsg_);
     CmdMsg_ = msg;
+}
+
+void NavManager::NavStatusCallBack(const move_base_msgs::MoveBaseResult &msg)
+{
 }
 
 void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
