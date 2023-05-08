@@ -74,8 +74,9 @@ void NavManager::CmdVelCallBack(const geometry_msgs::Twist &msg)
     CmdMsg_ = msg;
 }
 
-void NavManager::NavStatusCallBack(const move_base_msgs::MoveBaseResult &msg)
+void NavManager::NavStatusCallBack(const actionlib_msgs::GoalStatusArray &msg)
 {
+    uint8_t MoveBaseStatus = msg.status_list[msg.status_list.size() - 1].status;
 }
 
 void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)

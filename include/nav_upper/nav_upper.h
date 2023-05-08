@@ -7,6 +7,7 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <move_base_msgs/MoveBaseResult.h>
+#include <actionlib_msgs/GoalStatusArray.h>
 
 class NavManager
 {
@@ -45,7 +46,7 @@ private:
     void LocalCostMapCallBack(const nav_msgs::OccupancyGrid &msg);
 
     ros::Subscriber NavStatusSubscriber_;
-    void NavStatusCallBack(const move_base_msgs::MoveBaseResult &msg);
+    void NavStatusCallBack(const actionlib_msgs::GoalStatusArray &msg);
 
     ros::Subscriber CmdVelSubscriber_;
     void CmdVelCallBack(const geometry_msgs::Twist &msg);
