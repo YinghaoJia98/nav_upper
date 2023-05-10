@@ -6,11 +6,14 @@ NavManager::NavManager(const ros::NodeHandle &nh, const ros::NodeHandle &nh_priv
     initialize();
     setupTimer();
     IfPubCmd_ = false;
+    IdSeqPub_ = 0;
+    MoveBaseStatus_ = 0;
+    NavManagerStatus_ = 0;
 }
 
 void NavManager::initialize()
 {
-    std::string CostMap_topic_, NavStatus_topic_;
+    std::string CostMap_topic_, NavStatus_topic_, NavTarget_topic_;
 
     nh_.param<std::string>("/nav_upper/nav_manager_settings/CostMap_topic", CostMap_topic_,
                            std::string("/hello"));
@@ -30,15 +33,21 @@ void NavManager::initialize()
 
     nh_.param<std::string>("/nav_upper/nav_manager_settings/CmdTopic", CmdTopic_,
                            std::string("/cmd_vel"));
+    nh_.param<std::string>("/nav_upper/nav_manager_settings/NavTarget_topic", NavTarget_topic_,
+                           std::string("/move_base_simple/goal"));
     CmdVelSubscriber_ = nh_.subscribe(CmdTopic_.c_str(), 1,
                                       &NavManager::CmdVelCallBack, this);
     CmdVelPub_ = nh_.advertise<geometry_msgs::Twist>(CmdTopic_.c_str(), 10);
+    PlannerTargetPub_ = nh_.advertise<geometry_msgs::PoseStamped>(NavTarget_topic_.c_str(), 10);
 
     nh_.param<double>("/nav_upper/nav_manager_settings/RobotWidth", robot_width_, 0.5);
     nh_.param<double>("/nav_upper/nav_manager_settings/TimeResidualMax", TimeResidualMax_, 1.0);
     nh_.param<double>("/nav_upper/nav_manager_settings/LookAhead_X", LookAhead_X_, 1.0);
     nh_.param<double>("/nav_upper/nav_manager_settings/LookAhead_Time", LookAhead_Time_, 1.0);
     nh_.param<bool>("/nav_upper/nav_manager_settings/IfTimeInsteadOfConstantXAhead", IfTimeInsteadOfConstantXAhead_, true);
+
+    NavManagerStart_server_ = nh_.advertiseService(
+        "NavManager_Start", &NavManager::stdNavManagerStartCallback, this);
 }
 
 void NavManager::setupTimer()
@@ -60,6 +69,14 @@ void NavManager::setupTimer()
         CmdPubTimer = nh_.createTimer(ros::Duration(duration_CmdPub),
                                       &NavManager::CmdPubTimerCallBack, this);
     }
+    if (1)
+    {
+        double ModelSwitch_Fps_;
+        nh_.param<double>("/nav_upper/nav_manager_settings/ModelSwitch_Fps", ModelSwitch_Fps_, 3.0);
+        double duration_ModelSwitch = 1.0 / (ModelSwitch_Fps_ + 0.00001);
+        ModelSwitchTimer = nh_.createTimer(ros::Duration(duration_ModelSwitch),
+                                           &NavManager::ModelSwitchTimerCallBack, this);
+    }
 }
 
 void NavManager::LocalCostMapCallBack(const nav_msgs::OccupancyGrid &msg)
@@ -70,20 +87,29 @@ void NavManager::LocalCostMapCallBack(const nav_msgs::OccupancyGrid &msg)
 
 void NavManager::CmdVelCallBack(const geometry_msgs::Twist &msg)
 {
-    std::lock_guard<std::mutex> lock2(UpdateCmdMsg_);
+    std::lock_guard<std::mutex> lock2(UpdateCmdMsgReceivedMutex_);
     CmdMsg_ = msg;
 }
 
 void NavManager::NavStatusCallBack(const actionlib_msgs::GoalStatusArray &msg)
 {
-    uint8_t MoveBaseStatus = msg.status_list[msg.status_list.size() - 1].status;
+    std::lock_guard<std::mutex> lock3(UpdateMovePlannerStatusMutex_);
+    MoveBaseStatus_ = msg.status_list[msg.status_list.size() - 1].status;
 }
 
 void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
 {
     std::lock_guard<std::mutex> lock(UpdateCostMapMutex_);
-    std::lock_guard<std::mutex> lock2(UpdateCmdMsg_);
+    std::lock_guard<std::mutex> lock2(UpdateCmdMsgReceivedMutex_);
+
+    std::lock_guard<std::mutex> lock4(CmdPubMutex_);
+    std::lock_guard<std::mutex> lock5(NavManagerMutex_);
     ROS_INFO("hello");
+
+    if (NavManagerStatus_ != 1)
+    {
+        return;
+    }
 
     tf::TransformListener world_base_listener;
     tf::StampedTransform world_base_transform;
@@ -121,7 +147,26 @@ void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
                                          0);
     if (!IfObstaclesExist_)
     {
+        // IfPubCmd_ = true;
         return;
+    }
+    else
+    {
+        NavManagerStatus_ = 2;
+        IfPubCmd_ = false;
+        geometry_msgs::PoseStamped TargetPose_;
+        TargetPose_.header.frame_id = WorldFrame_.c_str();
+        TargetPose_.header.seq = IdSeqPub_;
+        IdSeqPub_++;
+        TargetPose_.header.stamp = ros::Time::now();
+        TargetPose_.pose.position.x = RobotLocation_[0] + 2.0 * cos(yaw_robot_);
+        TargetPose_.pose.position.y = RobotLocation_[1] + 2.0 * sin(yaw_robot_);
+        TargetPose_.pose.position.z = world_base_transform.getOrigin().z();
+        TargetPose_.pose.orientation.x = world_base_transform.getRotation().x();
+        TargetPose_.pose.orientation.y = world_base_transform.getRotation().y();
+        TargetPose_.pose.orientation.z = world_base_transform.getRotation().z();
+        TargetPose_.pose.orientation.w = world_base_transform.getRotation().w();
+        PlannerTargetPub_.publish(TargetPose_);
     }
     // TODO Judge if there is obstacle
     // TODO Judge if the obstacle could be avoid
@@ -139,8 +184,7 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
     double TimeResiduals_ = CurrentTime_.toSec() - MapTime_.toSec();
     if (abs(TimeResiduals_) > TimeResidualMax_)
     {
-        ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.",
-                  TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
+        ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.", TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
         // return true;
     }
 
@@ -223,8 +267,12 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
 
 void NavManager::CmdPubTimerCallBack(const ros::TimerEvent &event)
 {
+    std::lock_guard<std::mutex> lock4(CmdPubMutex_);
+    std::lock_guard<std::mutex> lock5(NavManagerMutex_);
+
     if (IfPubCmd_)
     {
+        NavManagerStatus_ = 1;
         geometry_msgs::Twist CmdMsgPub_;
         CmdMsgPub_.angular.x = 0.0;
         CmdMsgPub_.angular.y = 0.0;
@@ -234,4 +282,46 @@ void NavManager::CmdPubTimerCallBack(const ros::TimerEvent &event)
         CmdMsgPub_.linear.z = 0.0;
         CmdVelPub_.publish(CmdMsgPub_);
     }
+}
+
+void NavManager::ModelSwitchTimerCallBack(const ros::TimerEvent &event)
+{
+    std::lock_guard<std::mutex> lock3(UpdateMovePlannerStatusMutex_);
+    std::lock_guard<std::mutex> lock4(CmdPubMutex_);
+    std::lock_guard<std::mutex> lock5(NavManagerMutex_);
+
+    if (NavManagerStatus_ == 2)
+    {
+        if (MoveBaseStatus_ == 3)
+        {
+            NavManagerStatus_ = 1;
+            IfPubCmd_ = true;
+        }
+    }
+}
+
+bool NavManager::stdNavManagerStartCallback(std_srvs::Trigger::Request &req,
+                                            std_srvs::Trigger::Response &res)
+{
+    std::lock_guard<std::mutex> lock4(CmdPubMutex_);
+    std::lock_guard<std::mutex> lock5(NavManagerMutex_);
+    if (NavManagerStatus_ == 2)
+    {
+        ROS_INFO("Now the robot is runing by planner and can not be started.");
+        res.success = false;
+        return false;
+    }
+    if (NavManagerStatus_ == 1)
+    {
+        ROS_INFO("Now the robot is going straight.");
+        res.success = false;
+        return false;
+    }
+    else
+    {
+        NavManagerStatus_ = 1;
+        IfPubCmd_ = true;
+    }
+    res.success = true;
+    return true;
 }

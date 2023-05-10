@@ -12,3 +12,5 @@ nav_manager_settings:
   CmdPub_Fps: 10.0
   SpinnerThread: 5
   NavStatus_topic: "/move_base/status"
+  NavTarget_topic: "/move_base_simple/goal"
+  ModelSwitch_Fps: 3.0

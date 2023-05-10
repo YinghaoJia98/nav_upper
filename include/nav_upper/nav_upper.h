@@ -8,6 +8,7 @@
 #include <tf/transform_listener.h>
 #include <move_base_msgs/MoveBaseResult.h>
 #include <actionlib_msgs/GoalStatusArray.h>
+#include <std_srvs/Trigger.h>
 
 class NavManager
 {
@@ -39,6 +40,11 @@ private:
     bool IfTimeInsteadOfConstantXAhead_;
     bool IfPubCmd_;
 
+    int IdSeqPub_;
+
+    uint8_t MoveBaseStatus_;
+    uint8_t NavManagerStatus_; // 1 for go straight;2 for planner
+
     nav_msgs::OccupancyGrid LocalCostMap_grid;
     geometry_msgs::Twist CmdMsg_;
 
@@ -53,14 +59,26 @@ private:
 
     ros::Publisher CmdVelPub_;
 
+    ros::Publisher PlannerTargetPub_;
+
     ros::Timer UpdateTargetTimer;
     void UpdateTargetTimerCallBack(const ros::TimerEvent &event);
 
     ros::Timer CmdPubTimer;
     void CmdPubTimerCallBack(const ros::TimerEvent &event);
 
+    ros::Timer ModelSwitchTimer;
+    void ModelSwitchTimerCallBack(const ros::TimerEvent &event);
+
+    ros::ServiceServer NavManagerStart_server_;
+    bool stdNavManagerStartCallback(std_srvs::Trigger::Request &req,
+                                    std_srvs::Trigger::Response &res);
+
     std::mutex UpdateCostMapMutex_;
-    std::mutex UpdateCmdMsg_;
+    std::mutex UpdateCmdMsgReceivedMutex_;
+    std::mutex UpdateMovePlannerStatusMutex_;
+    std::mutex CmdPubMutex_;
+    std::mutex NavManagerMutex_;
 };
 
 #endif
