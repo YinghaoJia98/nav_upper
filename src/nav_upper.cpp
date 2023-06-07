@@ -48,6 +48,9 @@ void NavManager::initialize()
 
     NavManagerStart_server_ = nh_.advertiseService(
         "NavManager_Start", &NavManager::stdNavManagerStartCallback, this);
+
+    NavManagerStop_server_ = nh_.advertiseService(
+        "NavManager_Stop", &NavManager::stdNavManagerStopCallback, this);
 }
 
 void NavManager::setupTimer()
@@ -94,10 +97,10 @@ void NavManager::CmdVelCallBack(const geometry_msgs::Twist &msg)
 void NavManager::NavStatusCallBack(const actionlib_msgs::GoalStatusArray &msg)
 {
     std::lock_guard<std::mutex> lock3(UpdateMovePlannerStatusMutex_);
-if(msg.status_list.size()>0)
-{
-    MoveBaseStatus_ = msg.status_list[msg.status_list.size() - 1].status;
-}
+    if (msg.status_list.size() > 0)
+    {
+        MoveBaseStatus_ = msg.status_list[msg.status_list.size() - 1].status;
+    }
 }
 
 void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
@@ -107,7 +110,7 @@ void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
 
     std::lock_guard<std::mutex> lock4(CmdPubMutex_);
     std::lock_guard<std::mutex> lock5(NavManagerMutex_);
-    //ROS_INFO("hello");
+    // ROS_INFO("hello");
 
     if (NavManagerStatus_ != 1)
     {
@@ -187,8 +190,8 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
     double TimeResiduals_ = CurrentTime_.toSec() - MapTime_.toSec();
     if (abs(TimeResiduals_) > TimeResidualMax_)
     {
-        //ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.", TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
-        // return true;
+        // ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.", TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
+        //  return true;
     }
 
     double CostMapResolution = CostMap.info.resolution;
@@ -197,7 +200,8 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
     if (CostMapFrame_middle_ != WorldFrame_)
     {
         ROS_ERROR("The frame of CostMap is not the World Frame.");
-        // return true;
+        WorldFrame_ = CostMapFrame_middle_;
+        return false;
     }
     geometry_msgs::Pose CostMapOriginInWorldFrame = CostMap.info.origin;
     tf::Quaternion q_CostMap_Middle_(CostMapOriginInWorldFrame.orientation.x,
@@ -325,6 +329,18 @@ bool NavManager::stdNavManagerStartCallback(std_srvs::Trigger::Request &req,
         NavManagerStatus_ = 1;
         IfPubCmd_ = true;
     }
+    res.success = true;
+    return true;
+}
+
+bool NavManager::stdNavManagerStopCallback(std_srvs::Trigger::Request &req,
+                                           std_srvs::Trigger::Response &res)
+{
+    std::lock_guard<std::mutex> lock4(CmdPubMutex_);
+    std::lock_guard<std::mutex> lock5(NavManagerMutex_);
+    NavManagerStatus_ = 0;
+    IfPubCmd_ = false;
+
     res.success = true;
     return true;
 }

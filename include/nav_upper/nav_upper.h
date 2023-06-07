@@ -75,6 +75,10 @@ private:
     bool stdNavManagerStartCallback(std_srvs::Trigger::Request &req,
                                     std_srvs::Trigger::Response &res);
 
+    ros::ServiceServer NavManagerStop_server_;
+    bool stdNavManagerStopCallback(std_srvs::Trigger::Request &req,
+                                   std_srvs::Trigger::Response &res);
+
     std::mutex UpdateCostMapMutex_;
     std::mutex UpdateCmdMsgReceivedMutex_;
     std::mutex UpdateMovePlannerStatusMutex_;
