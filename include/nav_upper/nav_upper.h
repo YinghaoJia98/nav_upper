@@ -9,6 +9,7 @@
 #include <move_base_msgs/MoveBaseResult.h>
 #include <actionlib_msgs/GoalStatusArray.h>
 #include <std_srvs/Trigger.h>
+#include <mutex>
 
 class NavManager
 {

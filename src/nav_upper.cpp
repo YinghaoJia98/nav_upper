@@ -2,7 +2,7 @@
 NavManager::NavManager(const ros::NodeHandle &nh, const ros::NodeHandle &nh_private)
     : nh_(nh), nh_private_(nh_private)
 {
-    // ROS_INFO("Hello, world.");
+    ROS_INFO("Hello, nav_upper.");
     initialize();
     setupTimer();
     IfPubCmd_ = false;
@@ -94,7 +94,10 @@ void NavManager::CmdVelCallBack(const geometry_msgs::Twist &msg)
 void NavManager::NavStatusCallBack(const actionlib_msgs::GoalStatusArray &msg)
 {
     std::lock_guard<std::mutex> lock3(UpdateMovePlannerStatusMutex_);
+if(msg.status_list.size()>0)
+{
     MoveBaseStatus_ = msg.status_list[msg.status_list.size() - 1].status;
+}
 }
 
 void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
@@ -104,7 +107,7 @@ void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
 
     std::lock_guard<std::mutex> lock4(CmdPubMutex_);
     std::lock_guard<std::mutex> lock5(NavManagerMutex_);
-    ROS_INFO("hello");
+    //ROS_INFO("hello");
 
     if (NavManagerStatus_ != 1)
     {
@@ -184,7 +187,7 @@ bool NavManager::IfObstaclesExist(nav_msgs::OccupancyGrid CostMap,
     double TimeResiduals_ = CurrentTime_.toSec() - MapTime_.toSec();
     if (abs(TimeResiduals_) > TimeResidualMax_)
     {
-        ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.", TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
+        //ROS_ERROR("The time residual is so big that the operating state of NavUpper might be poor! The time residual is %f. The current time is %f and the map time is %f.", TimeResiduals_, CurrentTime_.toSec(), MapTime_.toSec());
         // return true;
     }
 

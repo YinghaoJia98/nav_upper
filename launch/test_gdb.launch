@@ -1,0 +1,6 @@
+<launch>
+  
+  <node name="nav_upper" pkg="nav_upper" type="nav_upper_node" output="screen" launch-prefix="gdb -ex run --args ">
+  <rosparam file="$(find nav_upper)/config/configuration.yaml" command="load" />
+  </node>
+</launch>

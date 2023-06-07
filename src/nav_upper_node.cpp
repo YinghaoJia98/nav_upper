@@ -6,6 +6,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "nav_upper_node");
     ros::NodeHandle nh;
     ros::NodeHandle nh_private("~");
+ROS_INFO("Hello world.");
     NavManager NavManager_(nh, nh_private);
     int SpinnerThread_;
     nh.param<int>("/nav_upper/nav_manager_settings/SpinnerThread", SpinnerThread_, 1);
