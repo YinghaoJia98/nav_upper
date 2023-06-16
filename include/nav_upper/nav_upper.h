@@ -10,6 +10,7 @@
 #include <actionlib_msgs/GoalStatusArray.h>
 #include <std_srvs/Trigger.h>
 #include <mutex>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 class NavManager
 {

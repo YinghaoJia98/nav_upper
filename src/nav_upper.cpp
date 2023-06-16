@@ -6,7 +6,7 @@ NavManager::NavManager(const ros::NodeHandle &nh, const ros::NodeHandle &nh_priv
     initialize();
     setupTimer();
     IfPubCmd_ = false;
-    IdSeqPub_ = 0;
+    IdSeqPub_ = 1;
     MoveBaseStatus_ = 0;
     NavManagerStatus_ = 0;
 }
@@ -160,18 +160,60 @@ void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
     {
         NavManagerStatus_ = 2;
         IfPubCmd_ = false;
+
+        for (int id_count_ = 0; id_count_ < 12; id_count_++)
+        {
+            geometry_msgs::PoseStamped TargetPose_;
+            TargetPose_.header.frame_id = WorldFrame_.c_str();
+            TargetPose_.header.seq = IdSeqPub_;
+            IdSeqPub_++;
+            TargetPose_.header.stamp = ros::Time::now();
+            TargetPose_.pose.position.x = RobotLocation_[0] + (1.85 + 0.1 * id_count_) * cos(yaw_robot_);
+            TargetPose_.pose.position.y = RobotLocation_[1] + (1.85 + 0.1 * id_count_) * sin(yaw_robot_);
+            TargetPose_.pose.position.z = 0.0;
+            tf2::Quaternion q_target_(world_base_transform.getRotation().x(),
+                                      world_base_transform.getRotation().y(),
+                                      world_base_transform.getRotation().z(),
+                                      world_base_transform.getRotation().w());
+            q_target_.setRPY(0, 0, yaw_robot_);
+            q_target_.normalize();
+            geometry_msgs::Quaternion q_target_msg_ = tf2::toMsg(q_target_);
+
+            TargetPose_.pose.orientation = q_target_msg_;
+            /*
+                    TargetPose_.pose.orientation.x = world_base_transform.getRotation().x();
+                    TargetPose_.pose.orientation.y = world_base_transform.getRotation().y();
+                    TargetPose_.pose.orientation.z = world_base_transform.getRotation().z();
+                    TargetPose_.pose.orientation.w = world_base_transform.getRotation().w();
+            */
+            PlannerTargetPub_.publish(TargetPose_);
+            usleep(1000000);
+        }
+
         geometry_msgs::PoseStamped TargetPose_;
         TargetPose_.header.frame_id = WorldFrame_.c_str();
         TargetPose_.header.seq = IdSeqPub_;
         IdSeqPub_++;
         TargetPose_.header.stamp = ros::Time::now();
-        TargetPose_.pose.position.x = RobotLocation_[0] + 2.0 * cos(yaw_robot_);
-        TargetPose_.pose.position.y = RobotLocation_[1] + 2.0 * sin(yaw_robot_);
-        TargetPose_.pose.position.z = world_base_transform.getOrigin().z();
-        TargetPose_.pose.orientation.x = world_base_transform.getRotation().x();
-        TargetPose_.pose.orientation.y = world_base_transform.getRotation().y();
-        TargetPose_.pose.orientation.z = world_base_transform.getRotation().z();
-        TargetPose_.pose.orientation.w = world_base_transform.getRotation().w();
+        TargetPose_.pose.position.x = RobotLocation_[0] + 2.35 * cos(yaw_robot_);
+        TargetPose_.pose.position.y = RobotLocation_[1] + 2.35 * sin(yaw_robot_);
+        // TargetPose_.pose.position.z = world_base_transform.getOrigin().z();
+        TargetPose_.pose.position.z = 0.0;
+        tf2::Quaternion q_target_(world_base_transform.getRotation().x(),
+                                  world_base_transform.getRotation().y(),
+                                  world_base_transform.getRotation().z(),
+                                  world_base_transform.getRotation().w());
+        q_target_.setRPY(0, 0, yaw_robot_);
+        q_target_.normalize();
+        geometry_msgs::Quaternion q_target_msg_ = tf2::toMsg(q_target_);
+
+        TargetPose_.pose.orientation = q_target_msg_;
+        /*
+                TargetPose_.pose.orientation.x = world_base_transform.getRotation().x();
+                TargetPose_.pose.orientation.y = world_base_transform.getRotation().y();
+                TargetPose_.pose.orientation.z = world_base_transform.getRotation().z();
+                TargetPose_.pose.orientation.w = world_base_transform.getRotation().w();
+        */
         PlannerTargetPub_.publish(TargetPose_);
     }
     // TODO Judge if there is obstacle

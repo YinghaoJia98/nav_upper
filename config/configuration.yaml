@@ -1,6 +1,6 @@
 nav_manager_settings:
   CostMap_topic: "/move_base/local_costmap/costmap"
-  UpdateTarget_Fps: 5.0
+  UpdateTarget_Fps: 10.0
   RobotWidth: 0.5
   TimeResidualMax: 1.0
   WorldFrame: "map"
@@ -8,9 +8,9 @@ nav_manager_settings:
   LookAhead_X: 1.0
   CmdTopic: "/cmd_vel"
   IfTimeInsteadOfConstantXAhead: true
-  LookAhead_Time: 1.0
+  LookAhead_Time: 2.0
   CmdPub_Fps: 10.0
   SpinnerThread: 3
   NavStatus_topic: "/move_base/status"
   NavTarget_topic: "/move_base_simple/goal"
-  ModelSwitch_Fps: 3.0
+  ModelSwitch_Fps: 10.0
