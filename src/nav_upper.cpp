@@ -161,15 +161,15 @@ void NavManager::UpdateTargetTimerCallBack(const ros::TimerEvent &event)
         NavManagerStatus_ = 2;
         IfPubCmd_ = false;
 
-        for (int id_count_ = 0; id_count_ < 12; id_count_++)
+        for (int id_count_ = 0; id_count_ < 3; id_count_++)
         {
             geometry_msgs::PoseStamped TargetPose_;
             TargetPose_.header.frame_id = WorldFrame_.c_str();
             TargetPose_.header.seq = IdSeqPub_;
             IdSeqPub_++;
             TargetPose_.header.stamp = ros::Time::now();
-            TargetPose_.pose.position.x = RobotLocation_[0] + (1.85 + 0.1 * id_count_) * cos(yaw_robot_);
-            TargetPose_.pose.position.y = RobotLocation_[1] + (1.85 + 0.1 * id_count_) * sin(yaw_robot_);
+            TargetPose_.pose.position.x = RobotLocation_[0] + (1.85 + 0.5 * id_count_) * cos(yaw_robot_);
+            TargetPose_.pose.position.y = RobotLocation_[1] + (1.85 + 0.5 * id_count_) * sin(yaw_robot_);
             TargetPose_.pose.position.z = 0.0;
             tf2::Quaternion q_target_(world_base_transform.getRotation().x(),
                                       world_base_transform.getRotation().y(),
